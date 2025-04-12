@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres
+    container_name: usuarios_db_postgres
+    volumes:
+      - usuarios_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${USUARIOS_DB_NAME}
+      - POSTGRES_PASSWORD=${USUARIOS_DB_PASS}
+    ports:
+      - "${DB_HOST_PORT_DB}:${DB_PORT}"
+    networks:
+      - usuarios-network
+  api:
+    build: .
+    container_name: usuarios_api_node
+    ports:
+      - "${API_EXTERNAL_PORT}:${API_PORT}"
+    depends_on:
+      - db
+    networks:
+      - usuarios-network
+    environment:
+      - USUARIOS_DB_USER=${USUARIOS_DB_USER}
+      - USUARIOS_DB_PASS=${USUARIOS_DB_PASS}
+      - USUARIOS_DB_NAME=${USUARIOS_DB_NAME}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+networks:
+  usuarios-network:
+    driver: bridge
+
+volumes:
+  usuarios_db_data:

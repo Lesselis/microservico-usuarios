@@ -33,3 +33,6 @@ coverage/
 
 # Configurações do Docker
 docker-compose.override.yml
+
+#Dados sensíveis
+secrets/

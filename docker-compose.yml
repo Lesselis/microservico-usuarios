@@ -1,36 +1,20 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres
-    container_name: usuarios_db_postgres
-    volumes:
-      - usuarios_db_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=${USUARIOS_DB_NAME}
-      - POSTGRES_PASSWORD=${USUARIOS_DB_PASS}
-    ports:
-      - "${DB_HOST_PORT_DB}:${DB_PORT}"
-    networks:
-      - usuarios-network
-  api:
+  usuarios-api:
     build: .
     container_name: usuarios_api_node
-    ports:
-      - "${API_EXTERNAL_PORT}:${API_PORT}"
-    depends_on:
-      - db
-    networks:
-      - usuarios-network
+      
     environment:
-      - USUARIOS_DB_USER=${USUARIOS_DB_USER}
-      - USUARIOS_DB_PASS=${USUARIOS_DB_PASS}
-      - USUARIOS_DB_NAME=${USUARIOS_DB_NAME}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-networks:
-  usuarios-network:
-    driver: bridge
+      - NODE_ENV=development
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_APPLICATION_NAME=microservico-usuarios
+      - SPRING_SECURITY_USER_NAME=${CONFIG_SERVER_USERNAME}
+      - SPRING_SECURITY_USER_PASSWORD=${CONFIG_SERVER_PASSWORD}
+    networks:
+      - microservices-net
 
-volumes:
-  usuarios_db_data:
+
+networks:
+  microservices-net:
+    external: true

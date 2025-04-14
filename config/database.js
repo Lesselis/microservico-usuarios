@@ -1,32 +1,38 @@
-require('dotenv').config();
+const axios = require('axios');
 
-module.exports = {
-  development: {
-    username: process.env.USUARIOS_DB_USER,
-    password: process.env.USUARIOS_DB_PASS,
-    database: process.env.USUARIOS_DB_NAME,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'postgres', 
-    logging: console.log, // Mostra queries SQL no terminal durante desenvolvimento
-    define: {
-      underscored: true, // Usa snake_case em vez de camelCase
-      timestamps: true   // Cria created_at e updated_at automaticamente
-    }
-  },
-  test: {
-    dialect: 'postgres',
-    storage: ':memory:'
-  },
-  production: {
-    use_env_variable: 'DATABASE_URL',
-    dialect: 'postgres',
-    logging: false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
+const CONFIG_SERVER_URL = process.env.CONFIG_SERVER_URL;
+const SPRING_APPLICATION_NAME = process.env.SPRING_APPLICATION_NAME;
+const CONFIG_SERVER_USERNAME = process.env.SPRING_SECURITY_USER_NAME;
+const CONFIG_SERVER_PASSWORD = process.env.SPRING_SECURITY_USER_PASSWORD;
+
+async function loadDatabaseConfig() {
+  try {
+    const response = await axios.get(
+      `${CONFIG_SERVER_URL}/${SPRING_APPLICATION_NAME}/default`, 
+      {
+        auth: {
+          username: CONFIG_SERVER_USERNAME,
+          password: CONFIG_SERVER_PASSWORD,
+        },
       }
-    }
+    );
+
+    const databaseConfig = response.data.propertySources.find(
+      (source) => source.name.includes('microservico-usuarios.yml')
+    ).source.database.postgres;
+
+    return {
+      host: databaseConfig.host,
+      port: databaseConfig.port,
+      username: databaseConfig.username,
+      password: databaseConfig.password,
+      dialetic: databaseConfig.dialect,
+      pool: databaseConfig.pool,
+    };
+  } catch (error) {
+    console.error('Erro ao carregar as configurações do banco de dados:', error);
+    throw error;
   }
-};
+}
+
+module.exports = { loadDatabaseConfig };

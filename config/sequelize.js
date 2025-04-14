@@ -1,35 +1,30 @@
 const { Sequelize } = require('sequelize');
-const config = require('./database');
+const { loadDatabaseConfig } = require('./database');
 
-const env = process.env.NODE_ENV || 'development';
-const dbConfig = config[env];
+async function initializeSequelize() {
+  const config = await loadDatabaseConfig();
 
-const sequelize = new Sequelize(
-  dbConfig.database,
-  dbConfig.username,
-  dbConfig.password,
-  {
-    host: dbConfig.host,
-    port: dbConfig.port,
-    dialect: dbConfig.dialect,
-    logging: dbConfig.logging,
-    define: dbConfig.define,
+  const sequelize = new Sequelize('usuarios_db', config.username, config.password, {
+    host: config.host,
+    port: config.port,
+    dialect: config.dialetic,
     pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    }
-  }
-);
-
-// Teste de conexão automático
-sequelize.authenticate()
-  .then(() => {
-    console.log('✅ Conexão com PostgreSQL estabelecida');
-  })
-  .catch(err => {
-    console.error('❌ Falha na conexão:', err);
+      max: config.pool.max,
+      min: config.pool.min,
+      idle: config.pool.idle,
+    },
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
   });
 
-module.exports = sequelize;
+  try {
+    await sequelize.authenticate();
+    console.log('Conexão com o banco de dados estabelecida com sucesso.');
+  } catch (error) {
+    console.error('Erro ao conectar ao banco de dados:', error);
+    throw error;
+  }
+
+  return sequelize;
+}
+
+module.exports = initializeSequelize;

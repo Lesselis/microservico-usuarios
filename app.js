@@ -1,58 +1,80 @@
 require('dotenv').config();
 const express = require('express');
 const { Sequelize } = require('sequelize');
-const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/authRoutes');
+const routes = require('./routes');
+const errorHandler = require('./middleware/errorHandler');
+const { fetchRemoteConfig } = require('./service/configService');
+const { configureDatabase } = require('./config/database');
 
-// 1. Configuração do Sequelize
-const sequelize = require('./config/sequelize');
+async function main() {
+  let sequelize;
+  const remoteConfig = await fetchRemoteConfig();
 
-// 2. Inicialização do Express
-const app = express();
+  if (remoteConfig) {
+    console.log('Configurações remotas carregadas com sucesso.');
+    const databaseConfig = await configureDatabase(remoteConfig);
 
-// 3. Middlewares essenciais
-app.use(express.json());
+    sequelize = new Sequelize(databaseConfig);
 
-// 4. Injeta sequelize nas rotas
-app.use((req, res, next) => {
-  req.sequelize = sequelize;
-  next();
-});
+    try {
+      await sequelize.authenticate();
+      sequelize.authenticated = true;
+      console.log('✅ Conexão com o banco de dados estabelecida com sucesso.');
+    } catch (error) {
+      console.error('❌ Erro ao conectar ao banco de dados:', error);
+      sequelize.authenticated = false;
+    }
+  } else {
+    console.error('❌ Falha ao carregar as configurações remotas. A aplicação não será iniciada.');
+    process.exit(1); // Encerra a aplicação em caso de falha na configuração
+    return;
+  }
 
-// 5. Rotas
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
+  const app = express();
 
-// 6. Health Check (simplificado)
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    dbStatus: sequelize.authenticated ? 'connected' : 'disconnected'
+  // Middlewares globais
+  app.use(express.json());
+
+  // Injeta sequelize nas rotas através do middleware
+  app.use((req, res, next) => {
+    req.sequelize = sequelize;
+    next();
   });
-});
 
-// 7. Tratamento de erros centralizado
-app.use((err, req, res, next) => {
-  if (!err.statusCode) err.statusCode = 500;
-  res.status(err.statusCode).json({ 
-    error: err.message || 'Erro interno',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  // Rotas principais
+  app.use('/', routes); // Monta o roteador principal no path '/'
+
+  // Health Check (agora usa o flag sequelize.authenticated)
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'OK',
+      dbStatus: sequelize && sequelize.authenticated ? 'connected' : 'disconnected'
+    });
   });
-});
 
-// 8. Inicialização do servidor
-const PORT = process.env.API_PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`✅ Servidor rodando na porta ${PORT}`);
-  console.log(`🔧 Modo: ${process.env.NODE_ENV || 'development'}`);
-});
+  // Middleware de tratamento de erros centralizado (deve ser o último middleware antes de iniciar o servidor)
+  app.use(errorHandler);
 
-// 9. Tratamento de sinais para shutdown graceful
-process.on('SIGTERM', () => {
-  server.close(() => {
-    sequelize.close();
-    console.log('Servidor encerrado');
+  // Inicialização do servidor
+  const PORT = process.env.API_PORT || 3000;
+  const server = app.listen(PORT, () => {
+    console.log(`✅ Servidor rodando na porta ${PORT}`);
   });
-});
 
-module.exports = app;
+  // Tratamento de sinais para shutdown graceful
+  process.on('SIGTERM', () => {
+    console.log('⚠️ Sinal de término recebido. Encerrando o servidor...');
+    server.close(async () => {
+      if (sequelize) {
+        await sequelize.close();
+        console.log('Database connection closed.');
+      }
+      console.log('✅ Servidor encerrado.');
+      process.exit(0);
+    });
+  });
+
+  module.exports = app;
+}
+
+main();

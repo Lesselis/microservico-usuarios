@@ -1,38 +1,28 @@
-const axios = require('axios');
+async function configureDatabase(remoteConfig) {
+  const databaseConfig = {};
 
-const CONFIG_SERVER_URL = process.env.CONFIG_SERVER_URL;
-const SPRING_APPLICATION_NAME = process.env.SPRING_APPLICATION_NAME;
-const CONFIG_SERVER_USERNAME = process.env.SPRING_SECURITY_USER_NAME;
-const CONFIG_SERVER_PASSWORD = process.env.SPRING_SECURITY_USER_PASSWORD;
-
-async function loadDatabaseConfig() {
-  try {
-    const response = await axios.get(
-      `${CONFIG_SERVER_URL}/${SPRING_APPLICATION_NAME}/default`, 
-      {
-        auth: {
-          username: CONFIG_SERVER_USERNAME,
-          password: CONFIG_SERVER_PASSWORD,
-        },
+  for (const key in remoteConfig) {
+    if (key.startsWith('database.postgres.')) {
+      const subKey = key.replace('database.postgres.', '');
+      if (subKey.includes('pool.')) {
+        const poolSubKey = subKey.replace('pool.', '');
+        databaseConfig.pool = databaseConfig.pool || {};
+        databaseConfig.pool[poolSubKey] = remoteConfig[key];
+      } else {
+        databaseConfig[subKey] = remoteConfig[key];
       }
-    );
-
-    const databaseConfig = response.data.propertySources.find(
-      (source) => source.name.includes('microservico-usuarios.yml')
-    ).source.database.postgres;
-
-    return {
-      host: databaseConfig.host,
-      port: databaseConfig.port,
-      username: databaseConfig.username,
-      password: databaseConfig.password,
-      dialetic: databaseConfig.dialect,
-      pool: databaseConfig.pool,
-    };
-  } catch (error) {
-    console.error('Erro ao carregar as configurações do banco de dados:', error);
-    throw error;
+    }
   }
+
+  return {
+    host: databaseConfig.host,
+    port: databaseConfig.port,
+    username: databaseConfig.username,
+    password: databaseConfig.password,
+    database: databaseConfig.database,
+    dialect: databaseConfig.dialect,
+    pool: databaseConfig.pool,
+  };
 }
 
-module.exports = { loadDatabaseConfig };
+module.exports = { configureDatabase };

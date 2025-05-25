@@ -3,10 +3,11 @@ FROM node:alpine
 WORKDIR /app
 
 COPY package*.json ./
+COPY . .
 
 RUN npm install
+RUN apk add --update curl
 
-COPY . .
 
 EXPOSE 3000
 

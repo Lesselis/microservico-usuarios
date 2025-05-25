@@ -4,11 +4,12 @@ services:
   usuarios-api:
     build: .
     container_name: usuarios_api_node
-      
+    env_file:
+      - .env  
     environment:
       - NODE_ENV=development
-      - CONFIG_SERVER_URL=http://config-server:8888
-      - SPRING_APPLICATION_NAME=microservico-usuarios
+      - CONFIG_SERVER_URL=${URL_SERVER}
+      - SPRING_APPLICATION_NAME=${CONFIG_SERVER_APPLICATIONS}
       - SPRING_SECURITY_USER_NAME=${CONFIG_SERVER_USERNAME}
       - SPRING_SECURITY_USER_PASSWORD=${CONFIG_SERVER_PASSWORD}
     networks:
